@@ -17,17 +17,28 @@ jobs:
           distribution: 'temurin'
           cache: gradle
 
-      - name: Setup Python
+       - name: Setup Python 3.8
         uses: actions/setup-python@v5
         with:
-          python-version: '3.8'
+          python-version: '3.8' # 必须锁定在 3.8，3.10+ 会导致 pip 报错
 
       - name: Fix Python Path and Create local.properties
         run: |
-          # 强制替换 pyramid 模块中的 Windows Python 路径
-          find . -name "build.gradle" -exec sed -i 's|D:/Programs/Python/Python38/python.exe|/usr/bin/python3|g' {} +
+          # 1. 获取 python3.8 的精确路径
+          PYTHON_PATH=$(which python3.8)
+          echo "Using Python path: $PYTHON_PATH"
+          
+          # 2. 强制替换所有 build.gradle 中的硬编码 Windows 路径
+          find . -name "build.gradle" -exec sed -i "s|D:/Programs/Python/Python38/python.exe|$PYTHON_PATH|g" {} +
+          
+          # 3. 写入 local.properties 供 Chaquopy 插件读取
           echo "sdk.dir=$ANDROID_SDK_ROOT" > local.properties
-          echo "buildPython=/usr/bin/python3" >> local.properties
+          echo "buildPython=$PYTHON_PATH" >> local.properties
+          
+          # 4. 针对 pyramid 模块可能存在的 buildPython 强制覆盖
+          if [ -f "pyramid/build.gradle" ]; then
+            sed -i "s|buildPython.*|buildPython \"$PYTHON_PATH\"|g" pyramid/build.gradle
+          fi
 
       - name: Grant execute permission
         run: chmod +x gradlew
