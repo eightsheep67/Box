@@ -66,31 +66,24 @@ public class IjkmPlayer extends IjkPlayer {
     @Override
     public void setDataSource(String path, Map<String, String> headers) {
         try {
-            // 1. 处理路径逻辑（RTSP/缓存等）
-            if (path != null && !TextUtils.isEmpty(path)) {
-                if(path.startsWith("rtsp")){
-                    mMediaPlayer.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "infbuf", 1);
-                    mMediaPlayer.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "rtsp_transport", "tcp");
-                } else if (!path.contains(".m3u8") && (path.contains(".mp4") || path.contains(".mkv") || path.contains(".avi"))) {
-                    if (Hawk.get(HawkConfig.IJK_CACHE_PLAY, false)) {
-                        String cachePath = FileUtils.getExternalCachePath() + "/ijkcaches/";
-                        File cacheFile = new File(cachePath);
-                        if (!cacheFile.exists()) cacheFile.mkdirs();
-                        String tmpMd5 = MD5.string2MD5(path);
-                        mMediaPlayer.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "cache_file_path", cachePath + tmpMd5 + ".file");
-                        mMediaPlayer.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "cache_map_path", cachePath + tmpMd5 + ".map");
-                        mMediaPlayer.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "parse_cache_map", 1);
-                        mMediaPlayer.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "auto_save_map", 1);
-                        mMediaPlayer.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "cache_max_capacity", 60 * 1024 * 1024);
-                        path = "ijkio:cache:ffio:" + path;
-                    }
-                }
+            if (path == null || TextUtils.isEmpty(path)) return;
+
+            // 1. 预设 IJK 播放参数（必须在 setDataSource 之前）
+            mMediaPlayer.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "safe", 0);
+            mMediaPlayer.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "protocol_whitelist", "ijkio,ffio,async,cache,crypto,file,dash,http,https,ijkhttphook,ijkinject,ijklivehook,ijklongurl,ijksegment,ijktcphook,pipe,rtp,tcp,tls,udp,ijkurlhook,data,concat,subfile,ffconcat");
+
+            // 2. 处理特定的 User-Agent 注入
+            applyCustomUAAndHeaders(headers);
+
+            // 3. 处理协议特定的优化
+            if (path.startsWith("rtsp")) {
+                mMediaPlayer.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "infbuf", 1);
+                mMediaPlayer.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "rtsp_transport", "tcp");
+            } else if (path.contains(".mp4") || path.contains(".mkv")) {
+                // ... 如果有缓存逻辑可以写在这里 ...
             }
 
-            // 2. 注入自定义 UA 和 Headers (必须在 setDataSource 之前)
-            applyHeaders(headers);
-
-            // 3. 关键：绕过父类，直接给 IJK 内核传 URL
+            // 4. 关键：直接调用底层设置数据源，不经过父类以防参数被重置
             mMediaPlayer.setDataSource(path);
 
         } catch (Exception e) {
@@ -100,28 +93,32 @@ public class IjkmPlayer extends IjkPlayer {
         }
     }
 
-    private void applyHeaders(Map<String, String> headers) {
-        // 获取 UI 设置中保存的自定义 UA
+    private void applyCustomUAAndHeaders(Map<String, String> headers) {
+        // 从存储中获取你设置的 okHttp/Mod-1.5.0.0
         String customUA = Hawk.get(HawkConfig.CUSTOM_UA, "");
         
-        // 强制注入 User-Agent
         if (!TextUtils.isEmpty(customUA)) {
-            mMediaPlayer.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "user_agent", customUA);
+            // 针对 IJK 内核，User-Agent 有专门的独立配置项
+            // 注意：这里传入的字符串不能带 \r\n
+            mMediaPlayer.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "user_agent", customUA.trim());
         }
 
-        // 处理其他可能传入的 Header (不含 Referer)
+        // 处理其他 Headers
+        StringBuilder sb = new StringBuilder();
         if (headers != null && !headers.isEmpty()) {
-            StringBuilder sb = new StringBuilder();
             for (Map.Entry<String, String> entry : headers.entrySet()) {
                 String key = entry.getKey();
-                // 排除 UA 避免冲突
-                if (key.equalsIgnoreCase("User-Agent") || key.equalsIgnoreCase("user-agent")) continue;
-                
+                // 排除任何形式的 User-Agent，防止重复导致校验失败
+                if (key.equalsIgnoreCase("User-Agent") || key.equalsIgnoreCase("user-agent")) {
+                    continue;
+                }
+                // IJK 的 headers 选项要求每一行都以 \r\n 结尾
                 sb.append(key).append(": ").append(entry.getValue()).append("\r\n");
             }
-            if (sb.length() > 0) {
-                mMediaPlayer.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "headers", sb.toString());
-            }
+        }
+
+        if (sb.length() > 0) {
+            mMediaPlayer.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "headers", sb.toString());
         }
     }
 
