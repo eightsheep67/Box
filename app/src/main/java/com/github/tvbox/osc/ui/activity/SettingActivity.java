@@ -170,6 +170,27 @@ public class SettingActivity extends BaseActivity {
                         }
                     }
                     break;
+                case KeyEvent.KEYCODE_8: 
+                    mHandler.removeCallbacks(mDevModeRun);
+                    devMode += "8";
+                    mHandler.postDelayed(mDevModeRun, 1000); // 增加容错，1秒内连按有效
+                    if (devMode.equals("8888")) {
+                        devMode = "";
+                        // 实例化输入对话框
+                        com.github.tvbox.osc.ui.dialog.InputDialog dialog = new com.github.tvbox.osc.ui.dialog.InputDialog(SettingActivity.this);
+                        dialog.setTitle("全局 User-Agent 设置");
+                        dialog.setHint("输入自定义 UA 字符串");
+                        dialog.setText(Hawk.get(HawkConfig.CUSTOM_UA, ""));
+                        dialog.setOnSubmitListener(new com.github.tvbox.osc.ui.dialog.InputDialog.OnSubmitListener() {
+                            @Override
+                            public void onSubmit(String text) {
+                                Hawk.put(HawkConfig.CUSTOM_UA, text);
+                                android.widget.Toast.makeText(SettingActivity.this, "UA 已保存，重启生效", android.widget.Toast.LENGTH_SHORT).show();
+                            }
+                        });
+                        dialog.show();
+                    }
+                    break;
             }
         } else if (event.getAction() == KeyEvent.ACTION_UP) {
             mHandler.postDelayed(mDataRunnable, 200);
