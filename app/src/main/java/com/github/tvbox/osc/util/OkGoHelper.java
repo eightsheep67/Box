@@ -164,15 +164,21 @@ public class OkGoHelper {
         initDnsOverHttps();
 
         OkHttpClient.Builder builder = new OkHttpClient.Builder();
-        builder.addInterceptor(new Interceptor() {
+        builder.addInterceptor(new okhttp3.Interceptor() {
             @Override
-            public Response intercept(Chain chain) throws IOException {
-                Request originalRequest = chain.request();
-                Request requestWithUserAgent = originalRequest.newBuilder()
-                    .removeHeader("User-Agent") // 移除默认 UA
-                    .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36") // 换成你想要的
-                    .build();
-                return chain.proceed(requestWithUserAgent);
+            public okhttp3.Response intercept(Chain chain) throws java.io.IOException {
+                okhttp3.Request originalRequest = chain.request();
+                // 从 Hawk 存储中读取你在设置界面填写的 UA
+                String customUA = com.orhanobut.hawk.Hawk.get(HawkConfig.CUSTOM_UA, "");
+                
+                if (!android.text.TextUtils.isEmpty(customUA)) {
+                    okhttp3.Request requestWithUserAgent = originalRequest.newBuilder()
+                        .removeHeader("User-Agent") // 先移除默认的
+                        .header("User-Agent", customUA) // 换成你填写的
+                        .build();
+                    return chain.proceed(requestWithUserAgent);
+                }
+                return chain.proceed(originalRequest);
             }
         });
         HttpLoggingInterceptor loggingInterceptor = new HttpLoggingInterceptor("OkGo");
