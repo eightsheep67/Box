@@ -121,25 +121,29 @@ public class IjkmPlayer extends IjkPlayer {
         }
     }
     private void setDataSourceHeader(Map<String, String> headers) {
+        // 定义你想要的全局默认 UA
+        String myDefaultUA = "okHttp/Mod-1.5.0.0";
+
         if (headers != null && !headers.isEmpty()) {
             String userAgent = headers.get("User-Agent");
-            if (!TextUtils.isEmpty(userAgent)) {
-                mMediaPlayer.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "user_agent", userAgent);
-                // 移除header中的User-Agent，防止重复
-                headers.remove("User-Agent");
+            if (TextUtils.isEmpty(userAgent)) {
+                // 如果视频源没提供 UA，使用你的默认 UA
+                userAgent = myDefaultUA;
             }
+            mMediaPlayer.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "user_agent", userAgent);
+            headers.remove("User-Agent"); // 移除防止重复设置到 headers 字符串里
+
+            // 设置剩余的 Headers
             if (headers.size() > 0) {
                 StringBuilder sb = new StringBuilder();
                 for (Map.Entry<String, String> entry : headers.entrySet()) {
-                    sb.append(entry.getKey());
-                    sb.append(":");
-                    String value = entry.getValue();
-                    if (!TextUtils.isEmpty(value))
-                        sb.append(entry.getValue());
-                    sb.append("\r\n");
-                    mMediaPlayer.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "headers", sb.toString());
+                    sb.append(entry.getKey()).append(":").append(entry.getValue()).append("\r\n");
                 }
+                mMediaPlayer.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "headers", sb.toString());
             }
+        } else {
+            // 如果连 headers 都是空的，直接给播放器设置你的默认 UA
+            mMediaPlayer.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "user_agent", myDefaultUA);
         }
     }
     public TrackInfo getTrackInfo() {
