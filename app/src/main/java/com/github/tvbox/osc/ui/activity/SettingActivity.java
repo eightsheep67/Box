@@ -156,25 +156,26 @@ public class SettingActivity extends BaseActivity {
 
     @Override
     public boolean dispatchKeyEvent(KeyEvent event) {
-        if (event.getKeyCode() == KeyEvent.KEYCODE_BACK) {
-            // 监听返回键长按
-            if (event.getAction() == KeyEvent.ACTION_DOWN && event.getRepeatCount() > 20) { 
-                // 修正类名为项目实际存在的类
-                com.github.tvbox.osc.ui.dialog.InputDialog dialog = new com.github.tvbox.osc.ui.dialog.InputDialog(SettingActivity.this);
-                dialog.setTitle("全局 User-Agent 设置");
-                // dialog.setHint("输入自定义 UA 字符串"); // 如果编译报错，尝试注释掉这一行
-                dialog.setText(Hawk.get(HawkConfig.CUSTOM_UA, ""));
-                dialog.setOnSubmitListener(new com.github.tvbox.osc.ui.dialog.InputDialog.OnSubmitListener() {
-                    @Override
-                    public void onSubmit(String text) {
-                        Hawk.put(HawkConfig.CUSTOM_UA, text);
-                        android.widget.Toast.makeText(SettingActivity.this, "UA 已保存，重启生效", android.widget.Toast.LENGTH_SHORT).show();
-                        dialog.dismiss();
+        // 监听返回键长按 (KEYCODE_BACK)
+        if (event.getKeyCode() == KeyEvent.KEYCODE_BACK && event.getAction() == KeyEvent.ACTION_DOWN && event.getRepeatCount() > 25) {
+            // 使用系统原生 AlertDialog，彻底解决找不到类的报错问题
+            final android.widget.EditText input = new android.widget.EditText(this);
+            input.setText(Hawk.get(HawkConfig.CUSTOM_UA, ""));
+            input.setHint("请输入自定义 User-Agent");
+            
+            new android.app.AlertDialog.Builder(this)
+                .setTitle("全局 User-Agent 设置")
+                .setView(input)
+                .setPositiveButton("保存", new android.content.DialogInterface.OnClickListener() {
+                    public void onClick(android.content.DialogInterface dialog, int which) {
+                        String val = input.getText().toString().trim();
+                        Hawk.put(HawkConfig.CUSTOM_UA, val);
+                        android.widget.Toast.makeText(SettingActivity.this, "UA已保存: " + val, android.widget.Toast.LENGTH_SHORT).show();
                     }
-                });
-                dialog.show();
-                return true; 
-            }
+                })
+                .setNegativeButton("取消", null)
+                .show();
+            return true;
         }
         if (event.getAction() == KeyEvent.ACTION_DOWN) {
             mHandler.removeCallbacks(mDataRunnable);
@@ -188,27 +189,6 @@ public class SettingActivity extends BaseActivity {
                         if (callback != null) {
                             callback.onChange();
                         }
-                    }
-                    break;
-                case KeyEvent.KEYCODE_8: 
-                    mHandler.removeCallbacks(mDevModeRun);
-                    devMode += "8";
-                    mHandler.postDelayed(mDevModeRun, 1000); // 增加容错，1秒内连按有效
-                    if (devMode.equals("8888")) {
-                        devMode = "";
-                        // 实例化输入对话框
-                        com.github.tvbox.osc.ui.dialog.InputDialog dialog = new com.github.tvbox.osc.ui.dialog.InputDialog(SettingActivity.this);
-                        dialog.setTitle("全局 User-Agent 设置");
-                        dialog.setHint("输入自定义 UA 字符串");
-                        dialog.setText(Hawk.get(HawkConfig.CUSTOM_UA, ""));
-                        dialog.setOnSubmitListener(new com.github.tvbox.osc.ui.dialog.InputDialog.OnSubmitListener() {
-                            @Override
-                            public void onSubmit(String text) {
-                                Hawk.put(HawkConfig.CUSTOM_UA, text);
-                                android.widget.Toast.makeText(SettingActivity.this, "UA 已保存，重启生效", android.widget.Toast.LENGTH_SHORT).show();
-                            }
-                        });
-                        dialog.show();
                     }
                     break;
             }
