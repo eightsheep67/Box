@@ -9,7 +9,18 @@ def static buildTime() {
 
 android {
     compileSdk 34
-
+    
+    signingConfigs {
+        release {
+            storeFile file("../.github/workflows/TVBoxOSC.jks")
+            storePassword "TVBoxOSC"
+            keyAlias "TVBoxOSC"
+            keyPassword "TVBoxOSC"
+            v1SigningEnabled true
+            v2SigningEnabled true
+        }
+    }
+    
     defaultConfig {
         applicationId 'com.github.tvbox.osc.tk'
         targetSdkVersion 28
