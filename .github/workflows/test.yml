@@ -1,31 +1,36 @@
 name: Test Build
 
 on:
-#  push:
-#    branches:
-#      - main
-#  pull_request:
   workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4  # 升级到 v4
         with:
           fetch-depth: 0
+          
+      - name: set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: gradle
+
       - name: Build With Gradle
         run: |
           chmod +x gradlew
           ./gradlew assemblerelease --build-cache --parallel --daemon --warning-mode all
+          
       - name: Prepare App
         run: |
           mkdir -p ${{ github.workspace }}/apk/
-          for file in `find ~ -name "*.apk" -print`; do
-            mv "$file" ${{ github.workspace }}/apk/
-          done
+          # 查找生成的 release APK 并移动到目标目录
+          find app/build/outputs/apk/release/ -name "*.apk" -exec mv {} ${{ github.workspace }}/apk/ \;
+          
       - name: Upload App To Artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4  # 必须升级到 v4
         with:
           name: com.github.tvbox.osc
-          path: ${{ github.workspace }}/apk/*
+          path: ${{ github.workspace }}/apk/*.apk
