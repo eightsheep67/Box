@@ -17,12 +17,17 @@ jobs:
           distribution: 'temurin'
           cache: gradle
 
-      - name: Create local.properties
-        # 这一步是为了修复 "local.properties (No such file or directory)" 错误
+      - name: Fix Python Path and Create local.properties
         run: |
+          # 1. 强制修改 pyramid 模块中的 Python 路径配置，适配 Linux 环境
+          if [ -f "pyramid/build.gradle" ]; then
+            sed -i 's|D:/Programs/Python/Python38/python.exe|/usr/bin/python3|g' pyramid/build.gradle
+          fi
+          
+          # 2. 创建 local.properties 满足 SDK 检查
           echo "sdk.dir=$ANDROID_SDK_ROOT" > local.properties
           echo "buildPython=/usr/bin/python3" >> local.properties
-
+          
       - name: Grant execute permission
         run: chmod +x gradlew
 
