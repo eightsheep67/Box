@@ -1,36 +1,42 @@
 name: Test Build
 
 on:
-  workflow_dispatch:
+  workflow_dispatch: # 手动触发打包
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4  # 升级到 v4
+      - name: Checkout Code
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          
-      - name: set up JDK 17
+
+      - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
           java-version: '17'
           distribution: 'temurin'
           cache: gradle
 
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
       - name: Build With Gradle
         run: |
-          chmod +x gradlew
-          ./gradlew assemblerelease --build-cache --parallel --daemon --warning-mode all
-          
+          # 编译 Release 版本，启用并行构建加速
+          ./gradlew assembleRelease --build-cache --parallel --daemon --warning-mode all
+
       - name: Prepare App
         run: |
-          mkdir -p ${{ github.workspace }}/apk/
-          # 查找生成的 release APK 并移动到目标目录
-          find app/build/outputs/apk/release/ -name "*.apk" -exec mv {} ${{ github.workspace }}/apk/ \;
-          
+          mkdir -p ${{ github.workspace }}/apk_out/
+          # 寻找编译生成的各种架构 APK (arm64, v7a, universal 等)
+          find app/build/outputs/apk/release/ -name "*.apk" -exec cp {} ${{ github.workspace }}/apk_out/ \;
+          # 检查是否找齐了文件
+          ls -R ${{ github.workspace }}/apk_out/
+
       - name: Upload App To Artifact
-        uses: actions/upload-artifact@v4  # 必须升级到 v4
+        uses: actions/upload-artifact@v4
         with:
-          name: com.github.tvbox.osc
-          path: ${{ github.workspace }}/apk/*.apk
+          name: TVBox_Custom_Build
+          path: ${{ github.workspace }}/apk_out/*.apk
