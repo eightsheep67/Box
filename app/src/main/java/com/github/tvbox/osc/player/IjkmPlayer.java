@@ -63,72 +63,65 @@ public class IjkmPlayer extends IjkPlayer {
         mMediaPlayer.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "protocol_whitelist", "ijkio,ffio,async,cache,crypto,file,dash,http,https,ijkhttphook,ijkinject,ijklivehook,ijklongurl,ijksegment,ijktcphook,pipe,rtp,tcp,tls,udp,ijkurlhook,data,concat,subfile,ffconcat");
     }
 
-    @Override
-    public void setDataSource(String path, Map<String, String> headers) {
-        try {
-            if (path == null || TextUtils.isEmpty(path)) return;
-            
-            // 额外补丁：先清空之前的 headers option，防止残留干扰
-            mMediaPlayer.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "headers", "");
-            mMediaPlayer.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "user_agent", "");
+@Override
+public void setDataSource(String path, Map<String, String> headers) {
+    try {
+        if (path == null || TextUtils.isEmpty(path)) return;
 
-            // 1. 预设 IJK 播放参数（必须在 setDataSource 之前）
-            mMediaPlayer.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "safe", 0);
-            mMediaPlayer.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "protocol_whitelist", "ijkio,ffio,async,cache,crypto,file,dash,http,https,ijkhttphook,ijkinject,ijklivehook,ijklongurl,ijksegment,ijktcphook,pipe,rtp,tcp,tls,udp,ijkurlhook,data,concat,subfile,ffconcat");
+        // 预设逻辑：重置、注入参数
+        mMediaPlayer.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "headers", "");
+        mMediaPlayer.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "user_agent", "");
+        applyCustomUAAndHeaders(headers);
+        mMediaPlayer.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "protocol_whitelist", "rtp,udp,tcp,tls,http,https,crypto,file,ijkio,ffio");
 
-            // 2. 处理特定的 User-Agent 注入
-            applyCustomUAAndHeaders(headers);
+        // --- 修正点：确保 path 是字符串而不是数组 ---
+        if (path.contains("#")) {
+            path = path.split("#")[0]; 
+        }
 
-            // 3. 处理协议特定的优化
-            if (path.startsWith("rtsp")) {
-                mMediaPlayer.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "infbuf", 1);
-                mMediaPlayer.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "rtsp_transport", "tcp");
-            } else if (path.contains(".mp4") || path.contains(".mkv")) {
-                // ... 如果有缓存逻辑可以写在这里 ...
-            }
+        // 处理中文路径
+        path = encodeSpaceChinese(path);
 
-            // 4. 关键：直接调用底层设置数据源，不经过父类以防参数被重置
-            mMediaPlayer.setDataSource(path);
+        mMediaPlayer.setDataSource(path);
 
-        } catch (Exception e) {
-            if (mPlayerEventListener != null) {
-                mPlayerEventListener.onError(-1, PlayerHelper.getRootCauseMessage(e));
-            }
+    } catch (Exception e) {
+        if (mPlayerEventListener != null) {
+            mPlayerEventListener.onError(-1, PlayerHelper.getRootCauseMessage(e));
+        }
+    }
+}
+
+private void applyCustomUAAndHeaders(Map<String, String> headers) {
+    String customUA = Hawk.get(HawkConfig.CUSTOM_UA, "okHttp/Mod-1.5.0.0").trim();
+    
+    // 1. 核心：强制注入 IJK 内核专用 UA 字段
+    mMediaPlayer.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "user_agent", customUA);
+
+    // 2. 针对 HTTPS 和特定服务器的优化
+    mMediaPlayer.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "safe", 0);
+    // 强制不验证证书（很多体育源证书过期或不规范）
+    mMediaPlayer.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "tls_verify", 0); 
+    // 强制重定向时也携带这个 UA
+    mMediaPlayer.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "http-header-no-default-ua", 1);
+
+    StringBuilder sb = new StringBuilder();
+    // 3. 核心：在 headers 字符串中手动置顶 User-Agent
+    sb.append("User-Agent: ").append(customUA).append("\r\n");
+
+    if (headers != null && !headers.isEmpty()) {
+        for (Map.Entry<String, String> entry : headers.entrySet()) {
+            String key = entry.getKey();
+            // 排除其他可能的干扰项
+            if (key.equalsIgnoreCase("User-Agent") || key.equalsIgnoreCase("user-agent")) continue;
+            sb.append(key).append(": ").append(entry.getValue()).append("\r\n");
         }
     }
 
-    private void applyCustomUAAndHeaders(Map<String, String> headers) {
-        String customUA = Hawk.get(HawkConfig.CUSTOM_UA, "");
-        
-        // 1. 独立设置：针对 IJK 内核的专用 UA 接口
-        if (!TextUtils.isEmpty(customUA)) {
-            mMediaPlayer.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "user_agent", customUA.trim());
-        }
-
-        StringBuilder sb = new StringBuilder();
-        
-        // 2. 混合设置：在 headers 字符串中再次强制注入 User-Agent
-        // 这样做是为了防止 IJK 底层在拼接 headers 时使用默认 UA 覆盖掉上面的独立设置
-        if (!TextUtils.isEmpty(customUA)) {
-            sb.append("User-Agent: ").append(customUA.trim()).append("\r\n");
-        }
-
-        if (headers != null && !headers.isEmpty()) {
-            for (Map.Entry<String, String> entry : headers.entrySet()) {
-                String key = entry.getKey();
-                // 严格排除外部传入的旧 UA
-                if (key.equalsIgnoreCase("User-Agent") || key.equalsIgnoreCase("user-agent")) {
-                    continue;
-                }
-                sb.append(key).append(": ").append(entry.getValue()).append("\r\n");
-            }
-        }
-
-        // 3. 最终注入所有请求头
-        if (sb.length() > 0) {
-            mMediaPlayer.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "headers", sb.toString());
-        }
+    if (sb.length() > 0) {
+        // 将拼接好的所有 Header（含自定义 UA）传给 IJK
+        mMediaPlayer.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "headers", sb.toString());
     }
+}
 
     @Override
     public void setDataSource(AssetFileDescriptor fd) {
