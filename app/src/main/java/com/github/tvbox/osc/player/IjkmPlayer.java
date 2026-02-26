@@ -54,7 +54,6 @@ public class IjkmPlayer extends IjkPlayer {
                 }
             }
         }
-        //开启内置字幕
         mMediaPlayer.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "subtitle", 1);
         mMediaPlayer.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "dns_cache_clear", 1);
         mMediaPlayer.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "dns_cache_timeout", -1);
@@ -88,19 +87,36 @@ public class IjkmPlayer extends IjkPlayer {
                     }
                 }
             }
+            // 先传给父类处理基本逻辑
+            super.setDataSource(path, headers);
+            // 核心修改：在父类执行后，立即强制注入 UA
             setDataSourceHeader(headers);
         } catch (Exception e) {
             mPlayerEventListener.onError(-1, PlayerHelper.getRootCauseMessage(e));
         }
-        //mMediaPlayer.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "protocol_whitelist", "ijkio,ffio,async,cache,crypto,file,http,https,ijkhttphook,ijkinject,ijklivehook,ijklongurl,ijksegment,ijktcphook,pipe,rtp,tcp,tls,udp,ijkurlhook,data");
         mMediaPlayer.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "protocol_whitelist", "ijkio,ffio,async,cache,crypto,file,dash,http,https,ijkhttphook,ijkinject,ijklivehook,ijklongurl,ijksegment,ijktcphook,pipe,rtp,tcp,tls,udp,ijkurlhook,data,concat,subfile,ffconcat");
-        //mMediaPlayer.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "packet-buffering", 0L);
-//        try {
-//            path = encodeSpaceChinese(path);//会导致本地文件无法播放，故注释掉
-//        } catch (Exception ignored) {
-//
-//        }
-        super.setDataSource(path, headers);
+    }
+
+    // 刚才缺失的 setDataSourceHeader 方法在这里
+    private void setDataSourceHeader(Map<String, String> headers) {
+        String customUA = Hawk.get(HawkConfig.CUSTOM_UA, "");
+        if (!TextUtils.isEmpty(customUA)) {
+            // 强制：直接覆盖 IJK 内核的 user_agent
+            mMediaPlayer.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "user_agent", customUA);
+            // 移除 header 里的 UA 防止重复冲突
+            if (headers != null) {
+                headers.remove("User-Agent");
+                headers.remove("user-agent");
+            }
+        }
+        // 处理其他 Headers
+        if (headers != null && !headers.isEmpty()) {
+            StringBuilder sb = new StringBuilder();
+            for (Map.Entry<String, String> entry : headers.entrySet()) {
+                sb.append(entry.getKey()).append(":").append(entry.getValue()).append("\r\n");
+            }
+            mMediaPlayer.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "headers", sb.toString());
+        }
     }
 
     private String encodeSpaceChinese(String str) throws UnsupportedEncodingException {
@@ -120,36 +136,7 @@ public class IjkmPlayer extends IjkPlayer {
             mPlayerEventListener.onError(-1, PlayerHelper.getRootCauseMessage(e));
         }
     }
-    private void setDataSourceHeader(Map<String, String> headers) {
-        // 读取设置界面填写的自定义 UA
-        String customUA = com.orhanobut.hawk.Hawk.get(HawkConfig.CUSTOM_UA, "");
 
-        if (headers != null && !headers.isEmpty()) {
-            String userAgent = headers.get("User-Agent");
-            
-            // 如果视频源没带 UA，且用户在设置里填了 UA，则使用用户的
-            if (android.text.TextUtils.isEmpty(userAgent) && !android.text.TextUtils.isEmpty(customUA)) {
-                userAgent = customUA;
-            }
-
-            if (!android.text.TextUtils.isEmpty(userAgent)) {
-                mMediaPlayer.setOption(tv.danmaku.ijk.media.player.IjkMediaPlayer.OPT_CATEGORY_FORMAT, "user_agent", userAgent);
-                headers.remove("User-Agent");
-            }
-            
-            // 设置其他 Header 属性
-            if (headers.size() > 0) {
-                StringBuilder sb = new StringBuilder();
-                for (Map.Entry<String, String> entry : headers.entrySet()) {
-                    sb.append(entry.getKey()).append(":").append(entry.getValue()).append("\r\n");
-                }
-                mMediaPlayer.setOption(tv.danmaku.ijk.media.player.IjkMediaPlayer.OPT_CATEGORY_FORMAT, "headers", sb.toString());
-            }
-        } else if (!android.text.TextUtils.isEmpty(customUA)) {
-            // 如果 Header 为空，直接强制设置自定义 UA
-            mMediaPlayer.setOption(tv.danmaku.ijk.media.player.IjkMediaPlayer.OPT_CATEGORY_FORMAT, "user_agent", customUA);
-        }
-    }
     public TrackInfo getTrackInfo() {
         IjkTrackInfo[] trackInfo = mMediaPlayer.getTrackInfo();
         if (trackInfo == null) return null;
@@ -158,7 +145,7 @@ public class IjkmPlayer extends IjkPlayer {
         int audioSelected = mMediaPlayer.getSelectedTrack(ITrackInfo.MEDIA_TRACK_TYPE_AUDIO);
         int index = 0;
         for (IjkTrackInfo info : trackInfo) {
-            if (info.getTrackType() == ITrackInfo.MEDIA_TRACK_TYPE_AUDIO) {//音轨信息
+            if (info.getTrackType() == ITrackInfo.MEDIA_TRACK_TYPE_AUDIO) {
                 String trackName = (data.getAudio().size() + 1) + "：" + info.getInfoInline();
                 TrackInfoBean t = new TrackInfoBean();
                 t.name = trackName;
@@ -167,7 +154,7 @@ public class IjkmPlayer extends IjkPlayer {
                 t.selected = index == audioSelected;
                 data.addAudio(t);
             }
-            if (info.getTrackType() == ITrackInfo.MEDIA_TRACK_TYPE_TIMEDTEXT) {//内置字幕
+            if (info.getTrackType() == ITrackInfo.MEDIA_TRACK_TYPE_TIMEDTEXT) {
                 String trackName = (data.getSubtitle().size() + 1) + "：" + info.getInfoInline();
                 TrackInfoBean t = new TrackInfoBean();
                 t.name = trackName;
@@ -188,5 +175,4 @@ public class IjkmPlayer extends IjkPlayer {
     public void setOnTimedTextListener(IMediaPlayer.OnTimedTextListener listener) {
         mMediaPlayer.setOnTimedTextListener(listener);
     }
-
 }
