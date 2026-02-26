@@ -49,5 +49,6 @@ jobs:
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: My-Box-Signed-APK
-          path: app/build/outputs/apk/release/**/*.apk
+         name: My-Box-Signed-APK
+          # 修改这里：使用更广的搜索路径，确保能抓到所有变体的 APK
+          path: app/build/outputs/apk/**/release/*.apk
