@@ -121,29 +121,33 @@ public class IjkmPlayer extends IjkPlayer {
         }
     }
     private void setDataSourceHeader(Map<String, String> headers) {
-        // 定义你想要的全局默认 UA
-        String myDefaultUA = "okHttp/Mod-1.5.0.0";
+        // 读取设置界面填写的自定义 UA
+        String customUA = com.orhanobut.hawk.Hawk.get(HawkConfig.CUSTOM_UA, "");
 
         if (headers != null && !headers.isEmpty()) {
             String userAgent = headers.get("User-Agent");
-            if (TextUtils.isEmpty(userAgent)) {
-                // 如果视频源没提供 UA，使用你的默认 UA
-                userAgent = myDefaultUA;
+            
+            // 如果视频源没带 UA，且用户在设置里填了 UA，则使用用户的
+            if (android.text.TextUtils.isEmpty(userAgent) && !android.text.TextUtils.isEmpty(customUA)) {
+                userAgent = customUA;
             }
-            mMediaPlayer.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "user_agent", userAgent);
-            headers.remove("User-Agent"); // 移除防止重复设置到 headers 字符串里
 
-            // 设置剩余的 Headers
+            if (!android.text.TextUtils.isEmpty(userAgent)) {
+                mMediaPlayer.setOption(tv.danmaku.ijk.media.player.IjkMediaPlayer.OPT_CATEGORY_FORMAT, "user_agent", userAgent);
+                headers.remove("User-Agent");
+            }
+            
+            // 设置其他 Header 属性
             if (headers.size() > 0) {
                 StringBuilder sb = new StringBuilder();
                 for (Map.Entry<String, String> entry : headers.entrySet()) {
                     sb.append(entry.getKey()).append(":").append(entry.getValue()).append("\r\n");
                 }
-                mMediaPlayer.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "headers", sb.toString());
+                mMediaPlayer.setOption(tv.danmaku.ijk.media.player.IjkMediaPlayer.OPT_CATEGORY_FORMAT, "headers", sb.toString());
             }
-        } else {
-            // 如果连 headers 都是空的，直接给播放器设置你的默认 UA
-            mMediaPlayer.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "user_agent", myDefaultUA);
+        } else if (!android.text.TextUtils.isEmpty(customUA)) {
+            // 如果 Header 为空，直接强制设置自定义 UA
+            mMediaPlayer.setOption(tv.danmaku.ijk.media.player.IjkMediaPlayer.OPT_CATEGORY_FORMAT, "user_agent", customUA);
         }
     }
     public TrackInfo getTrackInfo() {
