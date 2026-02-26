@@ -17,6 +17,12 @@ jobs:
           distribution: 'temurin'
           cache: gradle
 
+      - name: Create local.properties
+        # 这一步是为了修复 "local.properties (No such file or directory)" 错误
+        run: |
+          echo "sdk.dir=$ANDROID_SDK_ROOT" > local.properties
+          echo "buildPython=/usr/bin/python3" >> local.properties
+
       - name: Grant execute permission
         run: chmod +x gradlew
 
