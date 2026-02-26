@@ -59,7 +59,25 @@ public class OkGoHelper {
 
     static void initExoOkHttpClient() {
         OkHttpClient.Builder builder = new OkHttpClient.Builder();
+        
+        // --- 核心：为 Exo 客户端也加上 UA 拦截器 ---
+        builder.addInterceptor(new okhttp3.Interceptor() {
+            @Override
+            public okhttp3.Response intercept(Chain chain) throws java.io.IOException {
+                okhttp3.Request originalRequest = chain.request();
+                String customUA = com.orhanobut.hawk.Hawk.get(HawkConfig.CUSTOM_UA, "");
+                if (!android.text.TextUtils.isEmpty(customUA)) {
+                    return chain.proceed(originalRequest.newBuilder()
+                        .removeHeader("User-Agent")
+                        .header("User-Agent", customUA)
+                        .build());
+                }
+                return chain.proceed(originalRequest);
+            }
+        });
+
         HttpLoggingInterceptor loggingInterceptor = new HttpLoggingInterceptor("OkExoPlayer");
+        // ... (后续 loggingInterceptor 逻辑保持不变)
 
         if (Hawk.get(HawkConfig.DEBUG_OPEN, false)) {
             loggingInterceptor.setPrintLevel(HttpLoggingInterceptor.Level.BODY);
