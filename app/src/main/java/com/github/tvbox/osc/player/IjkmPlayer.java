@@ -67,6 +67,10 @@ public class IjkmPlayer extends IjkPlayer {
     public void setDataSource(String path, Map<String, String> headers) {
         try {
             if (path == null || TextUtils.isEmpty(path)) return;
+            
+            // 额外补丁：先清空之前的 headers option，防止残留干扰
+            mMediaPlayer.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "headers", "");
+            mMediaPlayer.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "user_agent", "");
 
             // 1. 预设 IJK 播放参数（必须在 setDataSource 之前）
             mMediaPlayer.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "safe", 0);
