@@ -1,4 +1,4 @@
-name: Test Build
+name: Build My Box Signed
 
 on:
   workflow_dispatch: # 手动触发打包
@@ -19,24 +19,27 @@ jobs:
           distribution: 'temurin'
           cache: gradle
 
-      - name: Grant execute permission for gradlew
+      - name: Configure Signing
+        run: |
+          # 1. 注入签名配置到 gradle.properties
+          # 注意：路径相对于 app 目录，所以用 ../ 指向 .github 文件夹
+          echo "RELEASE_STORE_FILE=../.github/workflows/TVBoxOSC.jks" >> gradle.properties
+          echo "RELEASE_STORE_PASSWORD=TVBoxOSC" >> gradle.properties
+          echo "RELEASE_KEY_ALIAS=TVBoxOSC" >> gradle.properties
+          echo "RELEASE_KEY_PASSWORD=TVBoxOSC" >> gradle.properties
+          
+          # 2. 修改 app/build.gradle 以启用签名
+          sed -i '/buildTypes {/i \    signingConfigs {\n        release {\n            storeFile file(RELEASE_STORE_FILE)\n            storePassword RELEASE_STORE_PASSWORD\n            keyAlias RELEASE_KEY_ALIAS\n            keyPassword RELEASE_KEY_PASSWORD\n            v1SigningEnabled true\n            v2SigningEnabled true\n        }\n    }' app/build.gradle
+          sed -i '/release {/a \            signingConfig signingConfigs.release' app/build.gradle
+
+      - name: Grant execute permission
         run: chmod +x gradlew
 
       - name: Build With Gradle
-        run: |
-          # 编译 Release 版本，启用并行构建加速
-          ./gradlew assembleRelease --build-cache --parallel --daemon --warning-mode all
+        run: ./gradlew assembleRelease --build-cache --parallel --daemon
 
-      - name: Prepare App
-        run: |
-          mkdir -p ${{ github.workspace }}/apk_out/
-          # 寻找编译生成的各种架构 APK (arm64, v7a, universal 等)
-          find app/build/outputs/apk/release/ -name "*.apk" -exec cp {} ${{ github.workspace }}/apk_out/ \;
-          # 检查是否找齐了文件
-          ls -R ${{ github.workspace }}/apk_out/
-
-      - name: Upload App To Artifact
+      - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: TVBox_Custom_Build
-          path: ${{ github.workspace }}/apk_out/*.apk
+          name: My-Box-Signed-APK
+          path: app/build/outputs/apk/release/*.apk
