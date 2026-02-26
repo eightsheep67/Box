@@ -164,6 +164,17 @@ public class OkGoHelper {
         initDnsOverHttps();
 
         OkHttpClient.Builder builder = new OkHttpClient.Builder();
+        builder.addInterceptor(new Interceptor() {
+            @Override
+            public Response intercept(Chain chain) throws IOException {
+                Request originalRequest = chain.request();
+                Request requestWithUserAgent = originalRequest.newBuilder()
+                    .removeHeader("User-Agent") // 移除默认 UA
+                    .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36") // 换成你想要的
+                    .build();
+                return chain.proceed(requestWithUserAgent);
+            }
+        });
         HttpLoggingInterceptor loggingInterceptor = new HttpLoggingInterceptor("OkGo");
 
         if (Hawk.get(HawkConfig.DEBUG_OPEN, false)) {
