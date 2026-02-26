@@ -19,6 +19,7 @@ public class HawkConfig {
     public static final String EPG_HISTORY = "epg_history";
     public static final String PROXY_SERVER = "proxy_server";
     // Settings
+    public static final String CUSTOM_UA = "custom_ua"; // 新增这一行，用于存储自定义UA
     public static final String DEBUG_OPEN = "debug_open";
     public static final String HOME_API = "home_api";
     public static final String HOME_REC = "home_rec";                    // 0 豆瓣 1 推荐 2 历史
