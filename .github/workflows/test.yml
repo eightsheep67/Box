@@ -51,4 +51,4 @@ jobs:
         with:
          name: My-Box-Signed-APK
           # 修改这里：使用更广的搜索路径，确保能抓到所有变体的 APK
-          path: app/build/outputs/apk/**/release/*.apk
+         path: app/build/outputs/apk/**/release/*.apk
