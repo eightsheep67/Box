@@ -156,6 +156,26 @@ public class SettingActivity extends BaseActivity {
 
     @Override
     public boolean dispatchKeyEvent(KeyEvent event) {
+        if (event.getKeyCode() == KeyEvent.KEYCODE_BACK) {
+            // 监听返回键长按 (注意：event.repeatCount > 0 表示长按)
+            if (event.getAction() == KeyEvent.ACTION_DOWN && event.getRepeatCount() > 20) { 
+                // 弹出 UA 输入框
+                com.github.tvbox.osc.ui.dialog.InputDialog dialog = new com.github.tvbox.osc.ui.dialog.InputDialog(SettingActivity.this);
+                dialog.setTitle("全局 User-Agent 设置");
+                dialog.setHint("输入自定义 UA 字符串");
+                dialog.setText(com.orhanobut.hawk.Hawk.get(com.github.tvbox.osc.util.HawkConfig.CUSTOM_UA, ""));
+                dialog.setOnSubmitListener(new com.github.tvbox.osc.ui.dialog.InputDialog.OnSubmitListener() {
+                    @Override
+                    public void onSubmit(String text) {
+                        com.orhanobut.hawk.Hawk.put(com.github.tvbox.osc.util.HawkConfig.CUSTOM_UA, text);
+                        android.widget.Toast.makeText(SettingActivity.this, "UA 已保存，重启生效", android.widget.Toast.LENGTH_SHORT).show();
+                        dialog.dismiss();
+                    }
+                });
+                dialog.show();
+                return true; // 拦截事件，防止触发退出
+            }
+        }
         if (event.getAction() == KeyEvent.ACTION_DOWN) {
             mHandler.removeCallbacks(mDataRunnable);
             int keyCode = event.getKeyCode();
