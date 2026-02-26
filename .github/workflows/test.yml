@@ -17,17 +17,18 @@ jobs:
           distribution: 'temurin'
           cache: gradle
 
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.8'
+
       - name: Fix Python Path and Create local.properties
         run: |
-          # 1. 强制修改 pyramid 模块中的 Python 路径配置，适配 Linux 环境
-          if [ -f "pyramid/build.gradle" ]; then
-            sed -i 's|D:/Programs/Python/Python38/python.exe|/usr/bin/python3|g' pyramid/build.gradle
-          fi
-          
-          # 2. 创建 local.properties 满足 SDK 检查
+          # 强制替换 pyramid 模块中的 Windows Python 路径
+          find . -name "build.gradle" -exec sed -i 's|D:/Programs/Python/Python38/python.exe|/usr/bin/python3|g' {} +
           echo "sdk.dir=$ANDROID_SDK_ROOT" > local.properties
           echo "buildPython=/usr/bin/python3" >> local.properties
-          
+
       - name: Grant execute permission
         run: chmod +x gradlew
 
