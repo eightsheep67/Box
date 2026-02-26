@@ -94,29 +94,33 @@ public class IjkmPlayer extends IjkPlayer {
     }
 
     private void applyCustomUAAndHeaders(Map<String, String> headers) {
-        // 从存储中获取你设置的 okHttp/Mod-1.5.0.0
         String customUA = Hawk.get(HawkConfig.CUSTOM_UA, "");
         
+        // 1. 独立设置：针对 IJK 内核的专用 UA 接口
         if (!TextUtils.isEmpty(customUA)) {
-            // 针对 IJK 内核，User-Agent 有专门的独立配置项
-            // 注意：这里传入的字符串不能带 \r\n
             mMediaPlayer.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "user_agent", customUA.trim());
         }
 
-        // 处理其他 Headers
         StringBuilder sb = new StringBuilder();
+        
+        // 2. 混合设置：在 headers 字符串中再次强制注入 User-Agent
+        // 这样做是为了防止 IJK 底层在拼接 headers 时使用默认 UA 覆盖掉上面的独立设置
+        if (!TextUtils.isEmpty(customUA)) {
+            sb.append("User-Agent: ").append(customUA.trim()).append("\r\n");
+        }
+
         if (headers != null && !headers.isEmpty()) {
             for (Map.Entry<String, String> entry : headers.entrySet()) {
                 String key = entry.getKey();
-                // 排除任何形式的 User-Agent，防止重复导致校验失败
+                // 严格排除外部传入的旧 UA
                 if (key.equalsIgnoreCase("User-Agent") || key.equalsIgnoreCase("user-agent")) {
                     continue;
                 }
-                // IJK 的 headers 选项要求每一行都以 \r\n 结尾
                 sb.append(key).append(": ").append(entry.getValue()).append("\r\n");
             }
         }
 
+        // 3. 最终注入所有请求头
         if (sb.length() > 0) {
             mMediaPlayer.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "headers", sb.toString());
         }
@@ -140,14 +144,6 @@ public class IjkmPlayer extends IjkPlayer {
         return b.toString();
     }
 
-    @Override
-    public void setDataSource(AssetFileDescriptor fd) {
-        try {
-            mMediaPlayer.setDataSource(new RawDataSourceProvider(fd));
-        } catch (Exception e) {
-            mPlayerEventListener.onError(-1, PlayerHelper.getRootCauseMessage(e));
-        }
-    }
 
     public TrackInfo getTrackInfo() {
         IjkTrackInfo[] trackInfo = mMediaPlayer.getTrackInfo();
