@@ -164,25 +164,23 @@ public class OkGoHelper {
         initDnsOverHttps();
 
         OkHttpClient.Builder builder = new OkHttpClient.Builder();
-        builder.addInterceptor(new okhttp3.Interceptor() {
-            @Override
-            public okhttp3.Response intercept(Chain chain) throws java.io.IOException {
-                okhttp3.Request originalRequest = chain.request();
-                // 从 Hawk 存储中读取你在设置界面填写的 UA
-                String customUA = com.orhanobut.hawk.Hawk.get(HawkConfig.CUSTOM_UA, "");
-                
-                if (!android.text.TextUtils.isEmpty(customUA)) {
-                    okhttp3.Request requestWithUserAgent = originalRequest.newBuilder()
-                        .removeHeader("User-Agent") // 先移除默认的
-                        .header("User-Agent", customUA) // 换成你填写的
-                        .build();
-                    return chain.proceed(requestWithUserAgent);
-                }
-                return chain.proceed(originalRequest);
-            }
-        });
-        HttpLoggingInterceptor loggingInterceptor = new HttpLoggingInterceptor("OkGo");
+        
+        // 1. 先配置基础属性
+        builder.readTimeout(DEFAULT_MILLISECONDS, TimeUnit.MILLISECONDS)
+                .writeTimeout(DEFAULT_MILLISECONDS, TimeUnit.MILLISECONDS)
+                .connectTimeout(DEFAULT_MILLISECONDS, TimeUnit.MILLISECONDS)
+                .dns(dnsOverHttps);
+        
+        builder.connectionSpecs(getConnectionSpec());
+        
+        try {
+            setOkHttpSsl(builder);
+        } catch (Throwable th) {
+            th.printStackTrace();
+        }
 
+        // 2. 配置日志拦截器
+        HttpLoggingInterceptor loggingInterceptor = new HttpLoggingInterceptor("OkGo");
         if (Hawk.get(HawkConfig.DEBUG_OPEN, false)) {
             loggingInterceptor.setPrintLevel(HttpLoggingInterceptor.Level.BODY);
             loggingInterceptor.setColorLevel(Level.INFO);
@@ -190,29 +188,46 @@ public class OkGoHelper {
             loggingInterceptor.setPrintLevel(HttpLoggingInterceptor.Level.NONE);
             loggingInterceptor.setColorLevel(Level.OFF);
         }
+        builder.addInterceptor(loggingInterceptor);
 
-        //builder.retryOnConnectionFailure(false);
-        builder.connectionSpecs(getConnectionSpec());
-        builder = builder.addInterceptor(loggingInterceptor)
-                .readTimeout(DEFAULT_MILLISECONDS, TimeUnit.MILLISECONDS)
-                .writeTimeout(DEFAULT_MILLISECONDS, TimeUnit.MILLISECONDS)
-                .connectTimeout(DEFAULT_MILLISECONDS, TimeUnit.MILLISECONDS)
-                .dns(dnsOverHttps);
-        try {
-            setOkHttpSsl(builder);
-        } catch (Throwable th) {
-            th.printStackTrace();
+        // 3. 关键：最后添加自定义 UA 拦截器，确保不被覆盖
+        builder.addInterceptor(new okhttp3.Interceptor() {
+            @Override
+            public okhttp3.Response intercept(Chain chain) throws java.io.IOException {
+                okhttp3.Request originalRequest = chain.request();
+                String customUA = com.orhanobut.hawk.Hawk.get(HawkConfig.CUSTOM_UA, "");
+                
+                if (!android.text.TextUtils.isEmpty(customUA)) {
+                    okhttp3.Request requestWithUserAgent = originalRequest.newBuilder()
+                        .removeHeader("User-Agent") 
+                        .header("User-Agent", customUA) 
+                        .build();
+                    return chain.proceed(requestWithUserAgent);
+                }
+                return chain.proceed(originalRequest);
+            }
+        });
+
+        // 4. 同步修改 OkGo 的全局 Header (防止冲突)
+        String cUA = com.orhanobut.hawk.Hawk.get(HawkConfig.CUSTOM_UA, "");
+        if (!android.text.TextUtils.isEmpty(cUA)) {
+            HttpHeaders.setUserAgent(cUA);
+        } else {
+            HttpHeaders.setUserAgent(Version.userAgent());
         }
 
-        HttpHeaders.setUserAgent(Version.userAgent());
+        // 5. 构建客户端
         OkHttpClient okHttpClient = builder.build();
         OkGo.getInstance().setOkHttpClient(okHttpClient);
 
         defaultClient = okHttpClient;
+        
+        // 构建不重定向的客户端
         builder.followRedirects(false);
         builder.followSslRedirects(false);
         noRedirectClient = builder.build();
 
+        // 6. 记得去改这个方法！ExoPlayer 也需要拦截器
         initExoOkHttpClient();        
     }
 
