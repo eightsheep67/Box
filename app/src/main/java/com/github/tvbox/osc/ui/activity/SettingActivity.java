@@ -154,29 +154,37 @@ public class SettingActivity extends BaseActivity {
 
     String devMode = "";
 
-    @Override
-    public boolean dispatchKeyEvent(KeyEvent event) {
-        // 监听返回键长按 (KEYCODE_BACK)
-        if (event.getKeyCode() == KeyEvent.KEYCODE_BACK && event.getAction() == KeyEvent.ACTION_DOWN && event.getRepeatCount() > 25) {
-            // 使用系统原生 AlertDialog，彻底解决找不到类的报错问题
-            final android.widget.EditText input = new android.widget.EditText(this);
-            input.setText(Hawk.get(HawkConfig.CUSTOM_UA, ""));
-            input.setHint("请输入自定义 User-Agent");
+@Override
+public boolean dispatchKeyEvent(KeyEvent event) {
+    // 监听返回键 (KEYCODE_BACK) 或 菜单键 (KEYCODE_MENU) 的长按
+    // 使用 == 26 确保长按期间只触发一次弹窗，避免重复弹出
+    if ((event.getKeyCode() == KeyEvent.KEYCODE_BACK || event.getKeyCode() == KeyEvent.KEYCODE_MENU) 
+        && event.getAction() == KeyEvent.ACTION_DOWN 
+        && event.getRepeatCount() == 26) {
+        
+        // 使用系统原生 AlertDialog
+        final android.widget.EditText input = new android.widget.EditText(this);
+        input.setText(Hawk.get(HawkConfig.CUSTOM_UA, ""));
+        input.setHint("请输入自定义 User-Agent");
+        
+        new android.app.AlertDialog.Builder(this)
+            .setTitle("全局 User-Agent 设置")
+            .setView(input)
+            .setPositiveButton("保存", new android.content.DialogInterface.OnClickListener() {
+                public void onClick(android.content.DialogInterface dialog, int which) {
+                    String val = input.getText().toString().trim();
+                    Hawk.put(HawkConfig.CUSTOM_UA, val);
+                    android.widget.Toast.makeText(SettingActivity.this, "UA已保存: " + val, android.widget.Toast.LENGTH_SHORT).show();
+                }
+            })
+            .setNegativeButton("取消", null)
+            .show();
             
-            new android.app.AlertDialog.Builder(this)
-                .setTitle("全局 User-Agent 设置")
-                .setView(input)
-                .setPositiveButton("保存", new android.content.DialogInterface.OnClickListener() {
-                    public void onClick(android.content.DialogInterface dialog, int which) {
-                        String val = input.getText().toString().trim();
-                        Hawk.put(HawkConfig.CUSTOM_UA, val);
-                        android.widget.Toast.makeText(SettingActivity.this, "UA已保存: " + val, android.widget.Toast.LENGTH_SHORT).show();
-                    }
-                })
-                .setNegativeButton("取消", null)
-                .show();
-            return true;
-        }
+        return true; // 拦截事件，防止触发返回或菜单的默认功能
+    }
+
+    return super.dispatchKeyEvent(event);
+}
         if (event.getAction() == KeyEvent.ACTION_DOWN) {
             mHandler.removeCallbacks(mDataRunnable);
             int keyCode = event.getKeyCode();
